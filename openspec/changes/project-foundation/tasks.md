@@ -44,7 +44,7 @@
 
 ## 8. CI and documentation
 
-- [ ] 8.1 Add a GitHub Actions workflow running `uv sync`, ruff check, ruff format check, mypy, and pytest (unit + integration with Docker) on push and pull request; verify the workflow passes on a pushed branch
+- [x] 8.1 Add a GitHub Actions workflow running `uv sync`, ruff check, ruff format check, mypy, and pytest (unit + integration with Docker) on push and pull request; verify the workflow passes on a pushed branch
 - [x] 8.2 Write `README.md` covering the project purpose, local setup (`uv sync`, `docker compose up -d`, `alembic upgrade head`, run server), running tests, module layout, and the layering rule `router -> service -> repository`; verify by following the README from a clean clone to a passing `/health/ready`
 
 ## 9. Integration check
