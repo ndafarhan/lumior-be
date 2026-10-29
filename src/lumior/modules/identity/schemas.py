@@ -30,14 +30,14 @@ class ChangePasswordRequest(BaseModel):
     new_password: Password
 
 
-class UserOut(BaseModel):
+class User(BaseModel):
     id: uuid.UUID
     email: str
     name: str
 
 
-class SessionOut(BaseModel):
+class Session(BaseModel):
     access_token: str = Field(description="Opaque bearer token for the `Authorization` header.")
-    token_type: Literal["bearer"] = "bearer"  # noqa: S105 - the token scheme, not a secret
+    token_type: Literal["bearer"]
     expires_in: int = Field(description="Access token lifetime in seconds (informational).")
-    user: UserOut
+    user: User

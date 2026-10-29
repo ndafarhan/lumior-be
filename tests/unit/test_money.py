@@ -9,7 +9,6 @@ from pydantic import ValidationError as PydanticValidationError
 
 from lumior.core.money import (
     Money,
-    MoneySchema,
     UnknownCurrencyError,
     currency_precision,
     round_half_up,
@@ -43,8 +42,13 @@ def test_unknown_currency() -> None:
 
 
 def test_money_of_rounds_to_currency_precision() -> None:
-    assert Money.of("10.005", "USD") == Money(Decimal("10.01"), "USD")
-    assert Money.of("199.5", "JPY") == Money(Decimal("200"), "JPY")
+    assert Money.of("10.005", "USD").amount == Decimal("10.01")
+    assert Money.of("199.5", "JPY").amount == Decimal("200")
+
+
+def test_money_of_allows_server_values_that_requests_may_not_send() -> None:
+    assert Money.of(0, "IDR").model_dump(mode="json") == {"amount": "0.00", "currency": "IDR"}
+    assert Money.of("-5", "USD").amount == Decimal("-5.00")
 
 
 def test_money_rejects_floats() -> None:
@@ -53,38 +57,74 @@ def test_money_rejects_floats() -> None:
 
 
 def test_amount_serialized_as_decimal_string() -> None:
-    schema = MoneySchema.from_money(Money.of(12500, "IDR"))
+    money = Money.of(12500, "IDR")
 
-    assert schema.model_dump(mode="json") == {"amount": "12500.00", "currency": "IDR"}
-    assert schema.model_dump_json() == '{"amount":"12500.00","currency":"IDR"}'
+    assert money.model_dump(mode="json") == {"currency": "IDR", "amount": "12500.00"}
+    assert money.model_dump_json() == '{"currency":"IDR","amount":"12500.00"}'
 
 
-def test_amount_parsed_from_string() -> None:
-    schema = MoneySchema.model_validate_json('{"amount": "19.999", "currency": "USD"}')
+def test_parsed_amount_is_written_with_the_currency_decimals() -> None:
+    money = Money.model_validate_json('{"amount": "19.9", "currency": "USD"}')
 
-    assert schema.amount == Decimal("20.00")
-    assert schema.to_money() == Money(Decimal("20.00"), "USD")
+    assert money == Money.of("19.90", "USD")
+    assert money.model_dump(mode="json")["amount"] == "19.90"
 
 
 @pytest.mark.parametrize("amount", ["12500", "12500.5", "true", '"1e5"', '"abc"', '""', "null"])
 def test_non_decimal_string_amounts_rejected(amount: str) -> None:
     with pytest.raises(PydanticValidationError):
-        MoneySchema.model_validate_json(f'{{"amount": {amount}, "currency": "USD"}}')
-
-
-def test_unknown_currency_rejected_by_schema() -> None:
-    with pytest.raises(PydanticValidationError):
-        MoneySchema.model_validate_json('{"amount": "1.00", "currency": "XXX"}')
+        Money.model_validate_json(f'{{"amount": {amount}, "currency": "USD"}}')
 
 
 def test_json_schema_declares_string_amount() -> None:
-    schema = MoneySchema.model_json_schema()
+    schema = Money.model_json_schema()
 
     assert schema["properties"]["amount"]["type"] == "string"
 
 
+def money_errors(body: str) -> list[tuple[object, ...]]:
+    with pytest.raises(PydanticValidationError) as excinfo:
+        Money.model_validate_json(body)
+    return [error["loc"] for error in excinfo.value.errors()]
+
+
+@pytest.mark.parametrize(
+    ("amount", "currency"),
+    [("0", "IDR"), ("-1", "IDR"), ("10.005", "IDR"), ("10.5", "JPY"), ("1000000000000", "IDR")],
+)
+def test_request_amounts_rejected_instead_of_rounded(amount: str, currency: str) -> None:
+    body = f'{{"amount": "{amount}", "currency": "{currency}"}}'
+
+    assert money_errors(body) == [("amount",)]
+
+
+def test_unknown_currency_reports_only_currency() -> None:
+    assert money_errors('{"amount": "10.005", "currency": "XXX"}') == [("currency",)]
+
+
+@pytest.mark.parametrize(
+    ("amount", "currency"), [("999999999999.99", "IDR"), ("0.01", "USD"), ("1200", "JPY")]
+)
+def test_request_amounts_at_the_limits(amount: str, currency: str) -> None:
+    money = Money.model_validate_json(f'{{"amount": "{amount}", "currency": "{currency}"}}')
+
+    assert money == Money.of(amount, currency)
+
+
+@pytest.mark.parametrize(
+    ("stored", "currency", "expected"),
+    [("1200.00", "JPY", "1200"), ("45000", "IDR", "45000.00"), ("0", "IDR", "0.00")],
+)
+def test_output_has_exactly_the_currency_decimals(
+    stored: str, currency: str, expected: str
+) -> None:
+    money = Money.of(Decimal(stored), currency)
+
+    assert money.model_dump(mode="json") == {"amount": expected, "currency": currency}
+
+
 class Payment(BaseModel):
-    total: MoneySchema
+    total: Money
 
 
 router = APIRouter(prefix="/api/v1/_test")

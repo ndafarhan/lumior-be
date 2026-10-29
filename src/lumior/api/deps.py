@@ -10,6 +10,7 @@ from lumior.core.clock import ClockDep
 from lumior.core.config import Settings
 from lumior.core.db import SessionDep
 from lumior.core.errors import UnauthorizedError
+from lumior.modules.expenses.service import ExpenseService
 from lumior.modules.households.service import HouseholdAccessContext, HouseholdService
 from lumior.modules.identity.models import User
 from lumior.modules.identity.service import AuthContext, IdentityService
@@ -63,7 +64,7 @@ async def get_household_access(
     user: CurrentUser,
     service: HouseholdServiceDep,
     # A string, not UUID: a malformed id must be 404 `household_not_found`, not 422.
-    household_id: Annotated[str, Path(alias="id")],
+    household_id: Annotated[str, Path()],
 ) -> HouseholdAccessContext:
     return await service.check_access(household_id, user.id)
 
@@ -76,10 +77,18 @@ async def get_owner_access(
 
 
 HouseholdAccess = Annotated[HouseholdAccessContext, Depends(get_household_access)]
-"""The caller is a member of the `{id}` household: 404 `household_not_found`, 403 `not_a_member`.
+"""The caller is a member of the `{household_id}` household: 404 `household_not_found`,
+403 `not_a_member`.
 
-Use on every `/households/{id}/...` route. Dependencies run before the body is validated, so
-these checks come before 422."""
+Use on every `/households/{household_id}/...` route. Dependencies run before the body is
+validated, so these checks come before 422."""
 
 OwnerAccess = Annotated[HouseholdAccessContext, Depends(get_owner_access)]
 """Like `HouseholdAccess`, and the caller is the owner: otherwise 403 `owner_required`."""
+
+
+def get_expense_service(session: SessionDep) -> ExpenseService:
+    return ExpenseService(session)
+
+
+ExpenseServiceDep = Annotated[ExpenseService, Depends(get_expense_service)]

@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,26 @@ def generate_operation_id(route: APIRoute) -> str:
     if route.tags:
         return f"{route.tags[0]}_{route.name}"
     return route.name
+
+
+# FastAPI documents a 422 with these schemas on every route that has parameters. Our 422s
+# use the error envelope instead, and each route that can return one declares it.
+FASTAPI_VALIDATION_SCHEMAS = ("HTTPValidationError", "ValidationError")
+
+
+def without_default_validation_responses(document: dict[str, Any]) -> dict[str, Any]:
+    ref = "#/components/schemas/HTTPValidationError"
+    for path_item in document["paths"].values():
+        for operation in path_item.values():
+            response = operation["responses"].get("422", {})
+            if response.get("content", {}).get("application/json", {}).get("schema") == {
+                "$ref": ref
+            }:
+                del operation["responses"]["422"]
+    schemas = document.get("components", {}).get("schemas", {})
+    for name in FASTAPI_VALIDATION_SCHEMAS:
+        schemas.pop(name, None)
+    return document
 
 
 @asynccontextmanager
@@ -64,6 +85,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(api_router)
+
+    build_openapi = app.openapi
+
+    def openapi() -> dict[str, Any]:
+        if app.openapi_schema is None:
+            app.openapi_schema = without_default_validation_responses(build_openapi())
+        return app.openapi_schema
+
+    app.openapi = openapi  # type: ignore[method-assign]
     return app
 
 

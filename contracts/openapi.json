@@ -21,6 +21,81 @@
         "title": "ChangePasswordRequest",
         "type": "object"
       },
+      "CreateExpenseCategoryRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateExpenseCategoryRequest",
+        "type": "object"
+      },
+      "CreateExpenseRequest": {
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "category_id": {
+            "format": "uuid",
+            "title": "Category Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stored trimmed; empty becomes null. At most 500 characters.",
+            "title": "Note"
+          },
+          "spent_on": {
+            "format": "date",
+            "title": "Spent On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "spent_on",
+          "category_id"
+        ],
+        "title": "CreateExpenseRequest",
+        "type": "object"
+      },
+      "CreateHouseholdRequest": {
+        "properties": {
+          "currency": {
+            "description": "ISO 4217, `IDR` when omitted. Fixed for the life of the household.",
+            "examples": [
+              "IDR"
+            ],
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateHouseholdRequest",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -29,9 +104,9 @@
             "type": "string"
           },
           "details": {
+            "description": "Empty unless the error concerns fields.",
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/ErrorDetail"
             },
             "title": "Details",
             "type": "array"
@@ -49,9 +124,16 @@
         "required": [
           "code",
           "message",
+          "details",
           "request_id"
         ],
         "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "additionalProperties": true,
+        "description": "One entry of `details`. For a field error: `{\"location\", \"reason\", \"type\"}`.",
+        "title": "ErrorDetail",
         "type": "object"
       },
       "ErrorResponse": {
@@ -66,17 +148,196 @@
         "title": "ErrorResponse",
         "type": "object"
       },
-      "HTTPValidationError": {
+      "Expense": {
         "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "title": "Detail",
-            "type": "array"
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "category_id": {
+            "format": "uuid",
+            "title": "Category Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "spent_on": {
+            "format": "date",
+            "title": "Spent On",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
           }
         },
-        "title": "HTTPValidationError",
+        "required": [
+          "id",
+          "amount",
+          "spent_on",
+          "category_id",
+          "note",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Expense",
+        "type": "object"
+      },
+      "ExpenseCategory": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "archived"
+        ],
+        "title": "ExpenseCategory",
+        "type": "object"
+      },
+      "ExpenseCategoryTotal": {
+        "properties": {
+          "category_id": {
+            "format": "uuid",
+            "title": "Category Id",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "category_id",
+          "total",
+          "count"
+        ],
+        "title": "ExpenseCategoryTotal",
+        "type": "object"
+      },
+      "ExpensePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Expense"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `cursor` for the next page. `null` on the last page. Opaque.",
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ExpensePage",
+        "type": "object"
+      },
+      "ExpenseSummary": {
+        "properties": {
+          "categories": {
+            "description": "Categories with spending in the month, active or archived, largest first.",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseCategoryTotal"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "month",
+          "total",
+          "categories"
+        ],
+        "title": "ExpenseSummary",
+        "type": "object"
+      },
+      "Household": {
+        "description": "A household from the current user's point of view.",
+        "properties": {
+          "currency": {
+            "description": "ISO 4217. Every amount in the household uses it.",
+            "title": "Currency",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "member_count": {
+            "title": "Member Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "The current user's role in this household."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role",
+          "member_count",
+          "currency"
+        ],
+        "title": "Household",
         "type": "object"
       },
       "HouseholdNameRequest": {
@@ -94,42 +355,7 @@
         "title": "HouseholdNameRequest",
         "type": "object"
       },
-      "HouseholdOut": {
-        "description": "A household from the current user's point of view.",
-        "properties": {
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "member_count": {
-            "title": "Member Count",
-            "type": "integer"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "role": {
-            "description": "The current user's role in this household.",
-            "enum": [
-              "owner",
-              "member"
-            ],
-            "title": "Role",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "role",
-          "member_count"
-        ],
-        "title": "HouseholdOut",
-        "type": "object"
-      },
-      "InviteOut": {
+      "Invite": {
         "properties": {
           "code": {
             "description": "URL-safe. The frontend links to `/invite/<code>`.",
@@ -146,10 +372,10 @@
           "code",
           "expires_at"
         ],
-        "title": "InviteOut",
+        "title": "Invite",
         "type": "object"
       },
-      "InvitePreviewOut": {
+      "InvitePreview": {
         "properties": {
           "already_member": {
             "title": "Already Member",
@@ -182,7 +408,7 @@
           "expires_at",
           "already_member"
         ],
-        "title": "InvitePreviewOut",
+        "title": "InvitePreview",
         "type": "object"
       },
       "LoginRequest": {
@@ -203,7 +429,7 @@
         "title": "LoginRequest",
         "type": "object"
       },
-      "MemberOut": {
+      "Member": {
         "properties": {
           "email": {
             "title": "Email",
@@ -214,12 +440,7 @@
             "type": "string"
           },
           "role": {
-            "enum": [
-              "owner",
-              "member"
-            ],
-            "title": "Role",
-            "type": "string"
+            "$ref": "#/components/schemas/Role"
           },
           "user_id": {
             "format": "uuid",
@@ -233,7 +454,34 @@
           "email",
           "role"
         ],
-        "title": "MemberOut",
+        "title": "Member",
+        "type": "object"
+      },
+      "Money": {
+        "description": "A monetary amount, in JSON `{\"amount\": \"12500.00\", \"currency\": \"IDR\"}`.\n\nParsed from a request, the amount must be greater than 0, fit storage (at most\n`MAX_INTEGER_DIGITS` digits before the point), and have at most the currency's decimal\nplaces: extra decimals are rejected, not rounded. Values the server computes, such as a\nzero total, are built with `Money.of`, which rounds and skips those request rules.",
+        "properties": {
+          "amount": {
+            "examples": [
+              "12500.00"
+            ],
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "currency": {
+            "examples": [
+              "IDR"
+            ],
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "amount"
+        ],
+        "title": "Money",
         "type": "object"
       },
       "RegisterRequest": {
@@ -265,7 +513,15 @@
         "title": "RegisterRequest",
         "type": "object"
       },
-      "SessionOut": {
+      "Role": {
+        "enum": [
+          "owner",
+          "member"
+        ],
+        "title": "Role",
+        "type": "string"
+      },
+      "Session": {
         "properties": {
           "access_token": {
             "description": "Opaque bearer token for the `Authorization` header.",
@@ -279,20 +535,68 @@
           },
           "token_type": {
             "const": "bearer",
-            "default": "bearer",
             "title": "Token Type",
             "type": "string"
           },
           "user": {
-            "$ref": "#/components/schemas/UserOut"
+            "$ref": "#/components/schemas/User"
           }
         },
         "required": [
           "access_token",
+          "token_type",
           "expires_in",
           "user"
         ],
-        "title": "SessionOut",
+        "title": "Session",
+        "type": "object"
+      },
+      "UpdateExpenseCategoryRequest": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "title": "UpdateExpenseCategoryRequest",
+        "type": "object"
+      },
+      "UpdateExpenseRequest": {
+        "description": "Omitted fields stay unchanged. Only `note` may be `null`, which clears it.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "category_id": {
+            "format": "uuid",
+            "title": "Category Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stored trimmed; empty becomes null. At most 500 characters.",
+            "title": "Note"
+          },
+          "spent_on": {
+            "format": "date",
+            "title": "Spent On",
+            "type": "string"
+          }
+        },
+        "title": "UpdateExpenseRequest",
         "type": "object"
       },
       "UpdateMeRequest": {
@@ -310,7 +614,7 @@
         "title": "UpdateMeRequest",
         "type": "object"
       },
-      "UserOut": {
+      "User": {
         "properties": {
           "email": {
             "title": "Email",
@@ -331,47 +635,7 @@
           "email",
           "name"
         ],
-        "title": "UserOut",
-        "type": "object"
-      },
-      "ValidationError": {
-        "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Location",
-            "type": "array"
-          },
-          "msg": {
-            "title": "Message",
-            "type": "string"
-          },
-          "type": {
-            "title": "Error Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError",
+        "title": "User",
         "type": "object"
       }
     },
@@ -408,7 +672,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionOut"
+                  "$ref": "#/components/schemas/Session"
                 }
               }
             },
@@ -428,11 +692,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Error codes: `validation_error`"
           }
         },
         "summary": "Login",
@@ -465,7 +729,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionOut"
+                  "$ref": "#/components/schemas/Session"
                 }
               }
             },
@@ -507,7 +771,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionOut"
+                  "$ref": "#/components/schemas/Session"
                 }
               }
             },
@@ -550,7 +814,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/HouseholdOut"
+                    "$ref": "#/components/schemas/Household"
                   },
                   "title": "Response Households List",
                   "type": "array"
@@ -581,13 +845,13 @@
         ]
       },
       "post": {
-        "description": "Create a household. The current user becomes its owner.",
+        "description": "Create a household with the default expense categories. The current user becomes its owner.",
         "operationId": "households_create",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/HouseholdNameRequest"
+                "$ref": "#/components/schemas/CreateHouseholdRequest"
               }
             }
           },
@@ -598,7 +862,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HouseholdOut"
+                  "$ref": "#/components/schemas/Household"
                 }
               }
             },
@@ -636,17 +900,17 @@
         ]
       }
     },
-    "/api/v1/households/{id}": {
+    "/api/v1/households/{household_id}": {
       "patch": {
         "description": "Rename the household. Owner only.",
         "operationId": "households_update",
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "household_id",
             "required": true,
             "schema": {
-              "title": "Id",
+              "title": "Household Id",
               "type": "string"
             }
           }
@@ -666,7 +930,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HouseholdOut"
+                  "$ref": "#/components/schemas/Household"
                 }
               }
             },
@@ -724,27 +988,31 @@
         ]
       }
     },
-    "/api/v1/households/{id}/invites": {
-      "post": {
-        "description": "Create a single-use invite. Owner only.",
-        "operationId": "households_create_invite",
+    "/api/v1/households/{household_id}/expense-categories": {
+      "get": {
+        "description": "All categories, active and archived, ordered by name (case-insensitive).",
+        "operationId": "expenses_list_categories",
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "household_id",
             "required": true,
             "schema": {
-              "title": "Id",
+              "title": "Household Id",
               "type": "string"
             }
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InviteOut"
+                  "items": {
+                    "$ref": "#/components/schemas/ExpenseCategory"
+                  },
+                  "title": "Response Expenses List Categories",
+                  "type": "array"
                 }
               }
             },
@@ -768,7 +1036,83 @@
                 }
               }
             },
-            "description": "Error codes: `not_a_member`, `owner_required`"
+            "description": "Error codes: `not_a_member`"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `household_not_found`"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Categories",
+        "tags": [
+          "expenses"
+        ]
+      },
+      "post": {
+        "description": "Create a category. Names are unique in the household, ignoring case.",
+        "operationId": "expenses_create_category",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExpenseCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseCategory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `unauthorized`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `not_a_member`"
           },
           "404": {
             "content": {
@@ -780,15 +1124,25 @@
             },
             "description": "Error codes: `household_not_found`"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `category_name_taken`"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Error codes: `validation_error`"
           }
         },
         "security": [
@@ -796,23 +1150,145 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Create Invite",
+        "summary": "Create Category",
         "tags": [
-          "households"
+          "expenses"
         ]
       }
     },
-    "/api/v1/households/{id}/members": {
-      "get": {
-        "description": "Members ordered by when they joined (oldest first).",
-        "operationId": "households_list_members",
+    "/api/v1/households/{household_id}/expense-categories/{category_id}": {
+      "patch": {
+        "description": "Rename, archive (`archived: true`), or restore (`archived: false`) a category. Existing expenses are unchanged. Categories cannot be deleted.",
+        "operationId": "expenses_update_category",
         "parameters": [
           {
             "in": "path",
-            "name": "id",
+            "name": "category_id",
             "required": true,
             "schema": {
-              "title": "Id",
+              "title": "Category Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExpenseCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseCategory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `unauthorized`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `not_a_member`"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `household_not_found`, `category_not_found`"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `category_name_taken`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `validation_error`"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Category",
+        "tags": [
+          "expenses"
+        ]
+      }
+    },
+    "/api/v1/households/{household_id}/expense-summary": {
+      "get": {
+        "description": "The month's total and, per category with spending, its total and count.",
+        "operationId": "expenses_get_summary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`YYYY-MM`.",
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "description": "`YYYY-MM`.",
+              "examples": [
+                "2026-10"
+              ],
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month",
               "type": "string"
             }
           }
@@ -822,11 +1298,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/MemberOut"
-                  },
-                  "title": "Response Households List Members",
-                  "type": "array"
+                  "$ref": "#/components/schemas/ExpenseSummary"
                 }
               }
             },
@@ -866,11 +1338,540 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Error codes: `validation_error`"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Summary",
+        "tags": [
+          "expenses"
+        ]
+      }
+    },
+    "/api/v1/households/{household_id}/expenses": {
+      "get": {
+        "description": "Expenses whose `spent_on` is in `month`, ordered by `spent_on`, then `created_at`, newest first. A `category_id` that is not one of the household's gives an empty page.",
+        "operationId": "expenses_list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`YYYY-MM`.",
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "description": "`YYYY-MM`.",
+              "examples": [
+                "2026-10"
+              ],
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Month",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Id"
+            }
+          },
+          {
+            "description": "`next_cursor` of the previous page.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_cursor` of the previous page.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `unauthorized`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `not_a_member`"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `household_not_found`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `validation_error`"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List",
+        "tags": [
+          "expenses"
+        ]
+      },
+      "post": {
+        "description": "Record an expense in the household's currency.",
+        "operationId": "expenses_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Expense"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `unauthorized`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `not_a_member`"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `household_not_found`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `validation_error`, `currency_mismatch`, `category_not_found`, `category_archived`"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create",
+        "tags": [
+          "expenses"
+        ]
+      }
+    },
+    "/api/v1/households/{household_id}/expenses/{expense_id}": {
+      "delete": {
+        "operationId": "expenses_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `unauthorized`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `not_a_member`"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `household_not_found`, `expense_not_found`"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete",
+        "tags": [
+          "expenses"
+        ]
+      },
+      "patch": {
+        "description": "Change any of the expense's fields. `note: null` clears the note.",
+        "operationId": "expenses_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Expense"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `unauthorized`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `not_a_member`"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `household_not_found`, `expense_not_found`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `validation_error`, `currency_mismatch`, `category_not_found`, `category_archived`"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update",
+        "tags": [
+          "expenses"
+        ]
+      }
+    },
+    "/api/v1/households/{household_id}/invites": {
+      "post": {
+        "description": "Create a single-use invite. Owner only.",
+        "operationId": "households_create_invite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invite"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `unauthorized`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `not_a_member`, `owner_required`"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `household_not_found`"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Invite",
+        "tags": [
+          "households"
+        ]
+      }
+    },
+    "/api/v1/households/{household_id}/members": {
+      "get": {
+        "description": "Members ordered by when they joined (oldest first).",
+        "operationId": "households_list_members",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Member"
+                  },
+                  "title": "Response Households List Members",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `unauthorized`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `not_a_member`"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Error codes: `household_not_found`"
           }
         },
         "security": [
@@ -884,7 +1885,7 @@
         ]
       }
     },
-    "/api/v1/households/{id}/members/{user_id}": {
+    "/api/v1/households/{household_id}/members/{user_id}": {
       "delete": {
         "description": "Leave the household (own `user_id`) or, as the owner, remove another member. The owner cannot leave.",
         "operationId": "households_remove_member",
@@ -900,10 +1901,10 @@
           },
           {
             "in": "path",
-            "name": "id",
+            "name": "household_id",
             "required": true,
             "schema": {
-              "title": "Id",
+              "title": "Household Id",
               "type": "string"
             }
           }
@@ -951,16 +1952,6 @@
               }
             },
             "description": "Error codes: `owner_cannot_leave`"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "security": [
@@ -994,7 +1985,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InvitePreviewOut"
+                  "$ref": "#/components/schemas/InvitePreview"
                 }
               }
             },
@@ -1029,16 +2020,6 @@
               }
             },
             "description": "Error codes: `invite_expired`, `invite_used`"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "security": [
@@ -1072,7 +2053,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HouseholdOut"
+                  "$ref": "#/components/schemas/Household"
                 }
               }
             },
@@ -1117,16 +2098,6 @@
               }
             },
             "description": "Error codes: `invite_expired`, `invite_used`"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "security": [
@@ -1148,7 +2119,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserOut"
+                  "$ref": "#/components/schemas/User"
                 }
               }
             },
@@ -1192,7 +2163,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserOut"
+                  "$ref": "#/components/schemas/User"
                 }
               }
             },

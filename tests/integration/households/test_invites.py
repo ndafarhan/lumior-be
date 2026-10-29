@@ -170,6 +170,7 @@ async def test_accept_joins_as_member(client: AsyncClient) -> None:
         "name": "Rumah",
         "role": "member",
         "member_count": 2,
+        "currency": "IDR",
     }
     listed = (await client.get("/api/v1/households", headers=budi.headers)).json()
     assert [h["id"] for h in listed] == [own, household]

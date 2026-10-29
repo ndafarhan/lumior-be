@@ -102,7 +102,7 @@ router -> service -> repository -> models
 - Every response carries `X-Request-ID` (echoed if the client sent a valid one), and the same ID
   appears in logs and error bodies.
 - Money is `Decimal`, never float. In JSON it is a string plus currency:
-  `{"amount": "12500.00", "currency": "IDR"}` (`lumior.core.money.MoneySchema`).
+  `{"amount": "12500.00", "currency": "IDR"}` (`lumior.core.money.Money`).
 - Quantities are stored in base units `g`, `ml`, or `piece` (`lumior.core.units`).
 
 ### Authentication
