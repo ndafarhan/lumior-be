@@ -12,19 +12,19 @@ from lumior.core.errors import (
     ValidationError,
     error_responses,
 )
+from lumior.modules.identity import models
 from lumior.modules.identity.cookies import (
     clear_refresh_cookie,
     read_refresh_cookie,
     set_refresh_cookie,
 )
-from lumior.modules.identity.models import User
 from lumior.modules.identity.schemas import (
     ChangePasswordRequest,
     LoginRequest,
     RegisterRequest,
-    SessionOut,
+    Session,
     UpdateMeRequest,
-    UserOut,
+    User,
 )
 from lumior.modules.identity.service import IssuedSession
 
@@ -34,14 +34,15 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 me_router = APIRouter(prefix="/me", tags=["identity"], responses=error_responses(UnauthorizedError))
 
 
-def user_out(user: User) -> UserOut:
-    return UserOut(id=user.id, email=user.email, name=user.name)
+def user_out(user: models.User) -> User:
+    return User(id=user.id, email=user.email, name=user.name)
 
 
-def session_response(issued: IssuedSession, response: Response, settings: Settings) -> SessionOut:
+def session_response(issued: IssuedSession, response: Response, settings: Settings) -> Session:
     set_refresh_cookie(response, issued.refresh_token, settings)
-    return SessionOut(
+    return Session(
         access_token=issued.access_token,
+        token_type="bearer",  # noqa: S106 - the token scheme, not a secret
         expires_in=settings.access_token_ttl_seconds,
         user=user_out(issued.user),
     )
@@ -60,7 +61,7 @@ async def register(
     service: IdentityServiceDep,
     settings: SettingsDep,
     clock: ClockDep,
-) -> SessionOut:
+) -> Session:
     issued = await service.register(
         name=body.name, email=body.email, password=body.password, now=clock()
     )
@@ -71,7 +72,7 @@ async def register(
     "/login",
     name="login",
     description="Sign in. Sets the refresh token cookie.",
-    responses=error_responses(InvalidCredentialsError),
+    responses=error_responses(InvalidCredentialsError, ValidationError),
 )
 async def login(
     body: LoginRequest,
@@ -79,7 +80,7 @@ async def login(
     service: IdentityServiceDep,
     settings: SettingsDep,
     clock: ClockDep,
-) -> SessionOut:
+) -> Session:
     issued = await service.login(email=body.email, password=body.password, now=clock())
     return session_response(issued, response, settings)
 
@@ -96,7 +97,7 @@ async def refresh(
     service: IdentityServiceDep,
     settings: SettingsDep,
     clock: ClockDep,
-) -> SessionOut:
+) -> Session:
     issued = await service.refresh(read_refresh_cookie(request, settings), now=clock())
     return session_response(issued, response, settings)
 
@@ -118,14 +119,12 @@ async def logout(
 
 
 @me_router.get("", name="get_me")
-async def get_me(user: CurrentUser) -> UserOut:
+async def get_me(user: CurrentUser) -> User:
     return user_out(user)
 
 
 @me_router.patch("", name="update_me", responses=error_responses(ValidationError))
-async def update_me(
-    body: UpdateMeRequest, user: CurrentUser, service: IdentityServiceDep
-) -> UserOut:
+async def update_me(body: UpdateMeRequest, user: CurrentUser, service: IdentityServiceDep) -> User:
     return user_out(await service.update_name(user, body.name))
 
 

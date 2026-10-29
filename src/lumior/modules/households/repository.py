@@ -17,6 +17,7 @@ class HouseholdView:
     name: str
     role: str
     member_count: int
+    currency: str
 
 
 @dataclass(frozen=True)
@@ -43,9 +44,11 @@ def _member_count() -> ScalarSelect[int]:
     )
 
 
-def _views_for(user_id: uuid.UUID) -> Select[uuid.UUID, str, str, int]:
+def _views_for(user_id: uuid.UUID) -> Select[uuid.UUID, str, str, int, str]:
     return (
-        select(Household.id, Household.name, HouseholdMember.role, _member_count())
+        select(
+            Household.id, Household.name, HouseholdMember.role, _member_count(), Household.currency
+        )
         .join(HouseholdMember, HouseholdMember.household_id == Household.id)
         .where(HouseholdMember.user_id == user_id)
     )

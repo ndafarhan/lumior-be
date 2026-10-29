@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -16,10 +16,14 @@ from lumior.core.request_id import get_request_id
 logger = logging.getLogger(__name__)
 
 
+class ErrorDetail(RootModel[dict[str, Any]]):
+    """One entry of `details`. For a field error: `{"location", "reason", "type"}`."""
+
+
 class ErrorBody(BaseModel):
     code: str = Field(description="Stable machine-readable snake_case error code.")
     message: str = Field(description="Human-readable description of the error.")
-    details: list[dict[str, Any]] = Field(default_factory=list)
+    details: list[ErrorDetail] = Field(description="Empty unless the error concerns fields.")
     request_id: str
 
 
@@ -163,6 +167,66 @@ class InviteUsedError(AppError):
     status_code = 410
     code = "invite_used"
     default_message = "The invite has already been used."
+
+
+# Expense errors from contracts/expenses.md section 6.
+
+
+def field_detail(location: list[str], reason: str, type_: str) -> dict[str, Any]:
+    """One `details` entry, shaped like those of request validation errors."""
+    return {"location": location, "reason": reason, "type": type_}
+
+
+class FieldError(AppError):
+    """An error about one request field: `details` always has an entry located at `location`."""
+
+    location: ClassVar[tuple[str, ...]] = ()
+
+    def __init__(self, message: str | None = None) -> None:
+        message = message or self.default_message
+        super().__init__(message, details=[field_detail(list(self.location), message, self.code)])
+
+
+class CategoryNotFoundError(AppError):
+    status_code = 404
+    code = "category_not_found"
+    default_message = "The category was not found in this household."
+
+
+class ExpenseNotFoundError(AppError):
+    status_code = 404
+    code = "expense_not_found"
+    default_message = "The expense was not found in this household."
+
+
+class CategoryNameTakenError(FieldError):
+    status_code = 409
+    code = "category_name_taken"
+    default_message = "A category with this name already exists in this household."
+    location = ("body", "name")
+
+
+class CategoryNotFoundInBodyError(FieldError):
+    """`category_not_found` for a `category_id` in a request body: 422, not 404."""
+
+    status_code = 422
+    code = "category_not_found"
+    default_message = "The category was not found in this household."
+    location = ("body", "category_id")
+
+
+class CategoryArchivedError(FieldError):
+    status_code = 422
+    code = "category_archived"
+    default_message = "The category is archived."
+    location = ("body", "category_id")
+
+
+class CurrencyMismatchError(FieldError):
+    status_code = 422
+    code = "currency_mismatch"
+    default_message = "The currency must be the household's currency."
+    location = ("body", "amount", "currency")
 
 
 HTTP_STATUS_CODES: dict[int, str] = {

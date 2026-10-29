@@ -105,8 +105,11 @@ def error_code(response: Response) -> str:
     return code
 
 
-async def create_household(client: AsyncClient, owner: SignedIn, name: str = "Rumah") -> str:
-    response = await client.post("/api/v1/households", json={"name": name}, headers=owner.headers)
+async def create_household(
+    client: AsyncClient, owner: SignedIn, name: str = "Rumah", currency: str | None = None
+) -> str:
+    body = {"name": name} if currency is None else {"name": name, "currency": currency}
+    response = await client.post("/api/v1/households", json=body, headers=owner.headers)
     assert response.status_code == 201, response.text
     household_id: str = response.json()["id"]
     return household_id

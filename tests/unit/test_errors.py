@@ -8,9 +8,15 @@ from pydantic import BaseModel
 from lumior.core.errors import (
     AlreadyMemberError,
     AppError,
+    CategoryArchivedError,
+    CategoryNameTakenError,
+    CategoryNotFoundError,
+    CategoryNotFoundInBodyError,
     ConflictError,
+    CurrencyMismatchError,
     EmailTakenError,
     ErrorResponse,
+    ExpenseNotFoundError,
     ForbiddenError,
     HouseholdNotFoundError,
     InvalidCredentialsError,
@@ -107,6 +113,9 @@ def assert_envelope(response: Response, status: int, code: str) -> dict[str, obj
         (AlreadyMemberError, 409, "already_member"),
         (InviteExpiredError, 410, "invite_expired"),
         (InviteUsedError, 410, "invite_used"),
+        # contracts/expenses.md section 6
+        (CategoryNotFoundError, 404, "category_not_found"),
+        (ExpenseNotFoundError, 404, "expense_not_found"),
     ],
 )
 def test_domain_exception_mapping(exc_type: type[AppError], status: int, code: str) -> None:
@@ -115,6 +124,25 @@ def test_domain_exception_mapping(exc_type: type[AppError], status: int, code: s
     assert exc.code == code
     assert exc.message
     assert exc.details == []
+
+
+@pytest.mark.parametrize(
+    ("exc_type", "status", "code", "location"),
+    [
+        (CategoryNameTakenError, 409, "category_name_taken", ["body", "name"]),
+        (CategoryNotFoundInBodyError, 422, "category_not_found", ["body", "category_id"]),
+        (CategoryArchivedError, 422, "category_archived", ["body", "category_id"]),
+        (CurrencyMismatchError, 422, "currency_mismatch", ["body", "amount", "currency"]),
+    ],
+)
+def test_field_error_mapping(
+    exc_type: type[AppError], status: int, code: str, location: list[str]
+) -> None:
+    exc = exc_type()
+
+    assert exc.status_code == status
+    assert exc.code == code
+    assert exc.details == [{"location": location, "reason": exc.message, "type": code}]
 
 
 async def test_unknown_path_under_api_prefix(client: AsyncClient) -> None:

@@ -1,4 +1,4 @@
-"""The generated OpenAPI document matches contracts/auth-and-households.md."""
+"""The generated OpenAPI document matches contracts/auth-and-households.md and expenses.md."""
 
 from pathlib import Path
 from typing import Any
@@ -101,12 +101,24 @@ CONTRACT_OPERATIONS = {
     ("post", "/api/v1/me/password"): "identity_change_password",
     ("get", "/api/v1/households"): "households_list",
     ("post", "/api/v1/households"): "households_create",
-    ("patch", "/api/v1/households/{id}"): "households_update",
-    ("get", "/api/v1/households/{id}/members"): "households_list_members",
-    ("delete", "/api/v1/households/{id}/members/{user_id}"): "households_remove_member",
-    ("post", "/api/v1/households/{id}/invites"): "households_create_invite",
+    ("patch", "/api/v1/households/{household_id}"): "households_update",
+    ("get", "/api/v1/households/{household_id}/members"): "households_list_members",
+    ("delete", "/api/v1/households/{household_id}/members/{user_id}"): "households_remove_member",
+    ("post", "/api/v1/households/{household_id}/invites"): "households_create_invite",
     ("get", "/api/v1/invites/{code}"): "households_get_invite",
     ("post", "/api/v1/invites/{code}/accept"): "households_accept_invite",
+    # contracts/expenses.md section 4
+    ("get", "/api/v1/households/{household_id}/expense-categories"): "expenses_list_categories",
+    ("post", "/api/v1/households/{household_id}/expense-categories"): "expenses_create_category",
+    (
+        "patch",
+        "/api/v1/households/{household_id}/expense-categories/{category_id}",
+    ): "expenses_update_category",
+    ("get", "/api/v1/households/{household_id}/expenses"): "expenses_list",
+    ("post", "/api/v1/households/{household_id}/expenses"): "expenses_create",
+    ("patch", "/api/v1/households/{household_id}/expenses/{expense_id}"): "expenses_update",
+    ("delete", "/api/v1/households/{household_id}/expenses/{expense_id}"): "expenses_delete",
+    ("get", "/api/v1/households/{household_id}/expense-summary"): "expenses_get_summary",
 }
 
 CONTRACT_PREFIXES = ("/api/v1/auth", "/api/v1/me", "/api/v1/households", "/api/v1/invites")
@@ -130,18 +142,18 @@ def test_document_has_exactly_the_contract_operations(document: dict[str, Any]) 
         ("post", "/api/v1/households", 201, {401: "unauthorized", 422: ""}),
         (
             "patch",
-            "/api/v1/households/{id}",
+            "/api/v1/households/{household_id}",
             200,
             {403: "owner_required", 404: "household_not_found", 422: ""},
         ),
-        ("get", "/api/v1/households/{id}/members", 200, {403: "not_a_member"}),
+        ("get", "/api/v1/households/{household_id}/members", 200, {403: "not_a_member"}),
         (
             "delete",
-            "/api/v1/households/{id}/members/{user_id}",
+            "/api/v1/households/{household_id}/members/{user_id}",
             204,
             {403: "owner_required", 404: "member_not_found", 409: "owner_cannot_leave"},
         ),
-        ("post", "/api/v1/households/{id}/invites", 201, {403: "not_a_member"}),
+        ("post", "/api/v1/households/{household_id}/invites", 201, {403: "not_a_member"}),
         (
             "get",
             "/api/v1/invites/{code}",
@@ -171,13 +183,147 @@ def test_household_operations(
         assert code in documented_codes(op, status)
 
 
+ACCESS = {403: "not_a_member", 404: "household_not_found"}
+BODY_422 = "`validation_error`, `currency_mismatch`, `category_not_found`, `category_archived`"
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "success", "errors"),
+    [
+        ("get", "/{household_id}/expense-categories", 200, ACCESS),
+        (
+            "post",
+            "/{household_id}/expense-categories",
+            201,
+            {**ACCESS, 409: "category_name_taken", 422: ""},
+        ),
+        (
+            "patch",
+            "/{household_id}/expense-categories/{category_id}",
+            200,
+            {403: "not_a_member", 404: "category_not_found", 409: "category_name_taken"},
+        ),
+        ("get", "/{household_id}/expenses", 200, {**ACCESS, 422: "validation_error"}),
+        ("post", "/{household_id}/expenses", 201, {**ACCESS, 422: BODY_422}),
+        (
+            "patch",
+            "/{household_id}/expenses/{expense_id}",
+            200,
+            {403: "not_a_member", 404: "expense_not_found", 422: BODY_422},
+        ),
+        ("delete", "/{household_id}/expenses/{expense_id}", 204, {404: "expense_not_found"}),
+        ("get", "/{household_id}/expense-summary", 200, {**ACCESS, 422: "validation_error"}),
+    ],
+)
+def test_expense_operations(
+    document: dict[str, Any],
+    method: str,
+    path: str,
+    success: int,
+    errors: dict[int, str],
+) -> None:
+    op = operation(document, method, f"/api/v1/households{path}")
+
+    assert str(success) in op["responses"]
+    assert op["security"] == [{"HTTPBearer": []}]
+    for status, code in errors.items():
+        assert code in documented_codes(op, status)
+
+
+def test_expense_amounts_are_money_strings(document: dict[str, Any]) -> None:
+    schemas = document["components"]["schemas"]
+
+    money = {"$ref": "#/components/schemas/Money"}
+    assert schemas["Money"]["properties"]["amount"]["type"] == "string"
+    assert schemas["Expense"]["properties"]["amount"] == money
+    assert schemas["CreateExpenseRequest"]["properties"]["amount"] == money
+
+
+def test_household_has_currency(document: dict[str, Any]) -> None:
+    schemas = document["components"]["schemas"]
+
+    assert "currency" in schemas["Household"]["required"]
+    create = schemas["CreateHouseholdRequest"]
+    assert create["required"] == ["name"]
+    # No `default`: generated client types would otherwise require it.
+    assert "default" not in create["properties"]["currency"]
+
+
 def test_household_id_path_parameter_is_a_string(document: dict[str, Any]) -> None:
     # A malformed id must reach the access check (404), not fail validation (422).
-    params = operation(document, "get", "/api/v1/households/{id}/members")["parameters"]
+    params = operation(document, "get", "/api/v1/households/{household_id}/members")["parameters"]
 
     assert params == [
-        {"name": "id", "in": "path", "required": True, "schema": {"type": "string", "title": "Id"}}
+        {
+            "name": "household_id",
+            "in": "path",
+            "required": True,
+            "schema": {"type": "string", "title": "Household Id"},
+        }
     ]
+
+
+# The frontend generates its types from this document and refers to schemas by these names.
+FRONTEND_SCHEMA_NAMES = {
+    "ChangePasswordRequest",
+    "CreateExpenseCategoryRequest",
+    "CreateExpenseRequest",
+    "CreateHouseholdRequest",
+    "ErrorBody",
+    "ErrorDetail",
+    "ErrorResponse",
+    "Expense",
+    "ExpenseCategory",
+    "ExpenseCategoryTotal",
+    "ExpensePage",
+    "ExpenseSummary",
+    "Household",
+    "HouseholdNameRequest",
+    "Invite",
+    "InvitePreview",
+    "LoginRequest",
+    "Member",
+    "Money",
+    "RegisterRequest",
+    "Role",
+    "Session",
+    "UpdateExpenseCategoryRequest",
+    "UpdateExpenseRequest",
+    "UpdateMeRequest",
+    "User",
+}
+
+
+def test_schema_names_match_the_frontend(document: dict[str, Any]) -> None:
+    assert set(document["components"]["schemas"]) == FRONTEND_SCHEMA_NAMES
+
+
+def test_every_documented_422_uses_the_error_envelope(document: dict[str, Any]) -> None:
+    envelope = {"$ref": "#/components/schemas/ErrorResponse"}
+    for path_item in document["paths"].values():
+        for op in path_item.values():
+            if "422" in op["responses"]:
+                schema = op["responses"]["422"]["content"]["application/json"]["schema"]
+                assert schema == envelope, op["operationId"]
+
+
+def test_patch_fields_that_cannot_be_cleared_are_not_nullable(document: dict[str, Any]) -> None:
+    schemas = document["components"]["schemas"]
+    expense = schemas["UpdateExpenseRequest"]["properties"]
+    category = schemas["UpdateExpenseCategoryRequest"]["properties"]
+
+    for field in (expense["amount"], expense["spent_on"], expense["category_id"]):
+        assert "anyOf" not in field
+    assert category["name"]["type"] == "string"
+    assert category["archived"]["type"] == "boolean"
+    assert {"type": "null"} in expense["note"]["anyOf"]
+
+
+def test_error_body_always_has_details(document: dict[str, Any]) -> None:
+    body = document["components"]["schemas"]["ErrorBody"]
+
+    assert set(body["required"]) == {"code", "message", "details", "request_id"}
+    assert body["properties"]["details"]["items"] == {"$ref": "#/components/schemas/ErrorDetail"}
 
 
 def test_committed_openapi_document_is_up_to_date() -> None:

@@ -44,7 +44,7 @@ async def test_concurrent_accepts_admit_exactly_one(
     sessions = async_sessionmaker(db_engine, expire_on_commit=False)
     async with sessions.begin() as session:
         service = HouseholdService(session, invite_ttl=TTL)
-        view = await service.create(owner.id, "Rumah", now=NOW)
+        view = await service.create(owner.id, "Rumah", "IDR", now=NOW)
         access = await service.check_access(str(view.id), owner.id)
         code = (await service.create_invite(access, now=NOW)).code
 

@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from lumior.modules.expenses.router import expenses_router
 from lumior.modules.households.router import households_router, invites_router
 from lumior.modules.identity.router import auth_router, me_router
 
@@ -12,3 +13,4 @@ api_router.include_router(auth_router)
 api_router.include_router(me_router)
 api_router.include_router(households_router)
 api_router.include_router(invites_router)
+api_router.include_router(expenses_router)

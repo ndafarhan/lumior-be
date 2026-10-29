@@ -18,6 +18,7 @@ from lumior.core.errors import (
     OwnerCannotLeaveError,
     OwnerRequiredError,
 )
+from lumior.modules.expenses.defaults import add_default_categories
 from lumior.modules.households.models import (
     Household,
     HouseholdInvite,
@@ -35,7 +36,7 @@ from lumior.modules.households.repository import (
 
 @dataclass(frozen=True)
 class HouseholdAccessContext:
-    """The household of a `/households/{id}/...` request and the caller's membership in it."""
+    """The household of a `/households/{household_id}/...` request and the caller's membership."""
 
     household: Household
     membership: HouseholdMember
@@ -58,6 +59,7 @@ def _parse_uuid(value: str) -> uuid.UUID | None:
 
 class HouseholdService:
     def __init__(self, session: AsyncSession, *, invite_ttl: timedelta) -> None:
+        self.session = session
         self.households = HouseholdRepository(session)
         self.invites = InviteRepository(session)
         self.invite_ttl = invite_ttl
@@ -76,9 +78,12 @@ class HouseholdService:
     async def list_for_user(self, user_id: uuid.UUID) -> list[HouseholdView]:
         return await self.households.list_views(user_id)
 
-    async def create(self, user_id: uuid.UUID, name: str, *, now: datetime) -> HouseholdView:
-        household = Household(id=uuid.uuid4(), name=name, created_at=now)
+    async def create(
+        self, user_id: uuid.UUID, name: str, currency: str, *, now: datetime
+    ) -> HouseholdView:
+        household = Household(id=uuid.uuid4(), name=name, currency=currency, created_at=now)
         await self.households.add(household)
+        await add_default_categories(self.session, household.id, now=now)
         await self.households.add_member(
             HouseholdMember(
                 household_id=household.id, user_id=user_id, role=Role.OWNER, joined_at=now

@@ -28,10 +28,11 @@ async def test_create_household(client: AsyncClient) -> None:
 
     assert response.status_code == 201
     body = response.json()
-    assert set(body) == {"id", "name", "role", "member_count"}
+    assert set(body) == {"id", "name", "role", "member_count", "currency"}
     assert body["name"] == "Rumah Bandung"
     assert body["role"] == "owner"
     assert body["member_count"] == 1
+    assert body["currency"] == "IDR"
 
 
 @pytest.mark.parametrize("name", ["n" * 101, "   "])
@@ -100,6 +101,7 @@ async def test_owner_renames(client: AsyncClient) -> None:
         "name": "Kos Jakarta",
         "role": "owner",
         "member_count": 2,
+        "currency": "IDR",
     }
     assert (await list_households(client, budi))[0]["name"] == "Kos Jakarta"
 

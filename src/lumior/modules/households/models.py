@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from lumior.core.db import Base
 
 NAME_MAX_LENGTH = 100
+DEFAULT_CURRENCY = "IDR"
 
 
 class Role(enum.StrEnum):
@@ -20,6 +21,8 @@ class Household(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(NAME_MAX_LENGTH))
+    # ISO 4217, a key of `CURRENCY_PRECISION`. Fixed at creation.
+    currency: Mapped[str] = mapped_column(String(3), default=DEFAULT_CURRENCY)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
