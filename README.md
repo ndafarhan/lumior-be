@@ -33,13 +33,18 @@ PostgreSQL. Change `POSTGRES_PORT` and `DATABASE_URL` in `.env` together if you 
 
 All settings come from environment variables (or `.env`) and are validated at startup.
 
-| Variable               | Default       | Notes                                                       |
-| ---------------------- | ------------- | ----------------------------------------------------------- |
-| `DATABASE_URL`         | (required)    | `postgresql+asyncpg://user:pass@host:port/db`               |
-| `ENVIRONMENT`          | `development` | `development`, `test`, `staging`, or `production`           |
-| `CORS_ALLOWED_ORIGINS` | empty         | Comma-separated origins; `*` is rejected                    |
-| `LOG_LEVEL`            | `INFO`        | Logs are JSON outside `development`                         |
-| `SECRET_KEY`           | `change-me`   | Placeholder until authentication is added                   |
+| Variable                   | Default          | Notes                                                         |
+| -------------------------- | ---------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`             | (required)       | `postgresql+asyncpg://user:pass@host:port/db`                 |
+| `ENVIRONMENT`              | `development`    | `development`, `test`, `staging`, or `production`             |
+| `CORS_ALLOWED_ORIGINS`     | empty            | Comma-separated origins; `*` is rejected                      |
+| `LOG_LEVEL`                | `INFO`           | Logs are JSON outside `development`                           |
+| `SECRET_KEY`               | `change-me`      | Signs access tokens; ≥32 chars required in staging/production |
+| `ACCESS_TOKEN_TTL_SECONDS` | `900`            | Access token lifetime                                         |
+| `REFRESH_TOKEN_TTL_DAYS`   | `30`             | Refresh cookie lifetime, renewed on every refresh             |
+| `REFRESH_GRACE_SECONDS`    | `30`             | How long a just-rotated refresh token is still accepted       |
+| `INVITE_TTL_DAYS`          | `7`              | Household invite lifetime                                     |
+| `REFRESH_COOKIE_NAME`      | `lumior_refresh` | Name of the refresh token cookie                              |
 
 ## Tests and checks
 
@@ -63,8 +68,8 @@ CI (`.github/workflows/ci.yml`) runs the same checks on every push and pull requ
 ```
 src/lumior/
   main.py          app factory: create_app(settings)
-  core/            config, db, errors, logging, request_id, money, units
-  api/             /api/v1 router aggregation (v1.py) and health probes
+  core/            config, db, errors, logging, request_id, clock, validation, money, units
+  api/             /api/v1 router aggregation (v1.py), shared dependencies (deps.py), health
   modules/<name>/  models.py, schemas.py, repository.py, service.py, router.py
 alembic/           migrations
 tests/unit/        tests without I/O
@@ -99,6 +104,35 @@ router -> service -> repository -> models
 - Money is `Decimal`, never float. In JSON it is a string plus currency:
   `{"amount": "12500.00", "currency": "IDR"}` (`lumior.core.money.MoneySchema`).
 - Quantities are stored in base units `g`, `ml`, or `piece` (`lumior.core.units`).
+
+### Authentication
+
+The contract with the frontend is `contracts/auth-and-households.md` (machine-readable:
+`contracts/openapi.json`).
+
+- Authenticated routes take `CurrentUser` (or `CurrentSession` when the sign-in session is
+  needed) from `lumior.api.deps`. A missing, invalid, or expired `Authorization: Bearer` token
+  is 401 `unauthorized`, raised before the route does anything.
+- Access tokens are short-lived JWTs. Refresh tokens are random, stored hashed, sent only as an
+  `HttpOnly` cookie on `Path=/api/v1/auth`, and rotated on every refresh.
+- Use `ClockDep` (`lumior.core.clock`) instead of `datetime.now()` in routes, and pass `now` to
+  services. Integration tests replace the clock with `FakeClock` to test expiry.
+
+### Household-scoped routes
+
+Every route under `/households/{id}/...` (and every later module scoped to a household, such as
+budgets or lists) must use one of these dependencies from `lumior.api.deps`:
+
+- `HouseholdAccess`: the caller is a member. Otherwise 404 `household_not_found` (unknown or
+  malformed id) or 403 `not_a_member`.
+- `OwnerAccess`: as above, and the caller is the owner. Otherwise 403 `owner_required`.
+
+Reuse these three error codes: the frontend treats `household_not_found` / `not_a_member` as
+"access lost" (it switches household) and `owner_required` as a permission message. Dependencies
+run before body validation, so these checks always come before a 422.
+
+Exception to the layering rule: the households repository joins `users` read-only to show
+member and inviter names. It never writes to identity's tables.
 
 ### Migrations
 

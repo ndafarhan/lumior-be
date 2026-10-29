@@ -14,6 +14,7 @@ from testcontainers.community.postgres import PostgresContainer
 from lumior.core.db import get_session
 from lumior.main import create_app
 from tests.conftest import make_settings
+from tests.integration.helpers import FakeClock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -67,8 +68,16 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-async def app(database_url: str, db_session: AsyncSession) -> AsyncIterator[FastAPI]:
+def clock() -> FakeClock:
+    return FakeClock()
+
+
+@pytest.fixture
+async def app(
+    database_url: str, db_session: AsyncSession, clock: FakeClock
+) -> AsyncIterator[FastAPI]:
     application = create_app(make_settings(database_url=database_url))
+    application.state.clock = clock
 
     async def override_session() -> AsyncIterator[AsyncSession]:
         yield db_session

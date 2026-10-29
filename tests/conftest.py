@@ -11,6 +11,7 @@ from lumior.main import create_app
 # Nothing listens on port 1, so any accidental database access fails fast.
 UNREACHABLE_DATABASE_URL = "postgresql+asyncpg://lumior:lumior@127.0.0.1:1/lumior"
 ALLOWED_ORIGIN = "http://allowed.example"
+TEST_SECRET_KEY = "test-secret-key-that-is-at-least-32-chars"
 
 
 def make_settings(**overrides: Any) -> Settings:
@@ -19,6 +20,7 @@ def make_settings(**overrides: Any) -> Settings:
         "database_url": UNREACHABLE_DATABASE_URL,
         "cors_allowed_origins": [ALLOWED_ORIGIN],
         "log_level": "INFO",
+        "secret_key": TEST_SECRET_KEY,
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)

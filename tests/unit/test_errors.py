@@ -6,12 +6,27 @@ from httpx import ASGITransport, AsyncClient, Response
 from pydantic import BaseModel
 
 from lumior.core.errors import (
+    AlreadyMemberError,
     AppError,
     ConflictError,
+    EmailTakenError,
+    ErrorResponse,
     ForbiddenError,
+    HouseholdNotFoundError,
+    InvalidCredentialsError,
+    InvalidCurrentPasswordError,
+    InvalidRefreshTokenError,
+    InviteExpiredError,
+    InviteNotFoundError,
+    InviteUsedError,
+    MemberNotFoundError,
+    NotAMemberError,
     NotFoundError,
+    OwnerCannotLeaveError,
+    OwnerRequiredError,
     UnauthorizedError,
     ValidationError,
+    error_responses,
 )
 
 SECRET_TEXT = "secret-dsn postgresql://admin:hunter2@db/prod"
@@ -78,6 +93,20 @@ def assert_envelope(response: Response, status: int, code: str) -> dict[str, obj
         (UnauthorizedError, 401, "unauthorized"),
         (ForbiddenError, 403, "forbidden"),
         (AppError, 400, "bad_request"),
+        # contracts/auth-and-households.md section 7
+        (InvalidCurrentPasswordError, 400, "invalid_current_password"),
+        (InvalidCredentialsError, 401, "invalid_credentials"),
+        (InvalidRefreshTokenError, 401, "invalid_refresh_token"),
+        (NotAMemberError, 403, "not_a_member"),
+        (OwnerRequiredError, 403, "owner_required"),
+        (HouseholdNotFoundError, 404, "household_not_found"),
+        (MemberNotFoundError, 404, "member_not_found"),
+        (InviteNotFoundError, 404, "invite_not_found"),
+        (EmailTakenError, 409, "email_taken"),
+        (OwnerCannotLeaveError, 409, "owner_cannot_leave"),
+        (AlreadyMemberError, 409, "already_member"),
+        (InviteExpiredError, 410, "invite_expired"),
+        (InviteUsedError, 410, "invite_used"),
     ],
 )
 def test_domain_exception_mapping(exc_type: type[AppError], status: int, code: str) -> None:
@@ -141,3 +170,12 @@ async def test_domain_error_default_message(client: AsyncClient) -> None:
     response = await client.get("/api/v1/_test/conflict")
 
     assert_envelope(response, 409, "conflict")
+
+
+def test_error_responses_group_codes_by_status() -> None:
+    responses = error_responses(NotAMemberError, HouseholdNotFoundError, OwnerRequiredError)
+
+    assert list(responses) == [403, 404]
+    assert responses[403]["model"] is ErrorResponse
+    assert responses[403]["description"] == "Error codes: `not_a_member`, `owner_required`"
+    assert responses[404]["description"] == "Error codes: `household_not_found`"

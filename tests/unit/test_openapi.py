@@ -44,7 +44,13 @@ async def test_operation_ids_are_module_action_and_unique() -> None:
         for path_item in document["paths"].values()  # type: ignore[attr-defined]
         for operation in path_item.values()
     ]
-    assert sorted(operation_ids) == [
+    test_operation_ids = [
+        operation["operationId"]
+        for path, path_item in document["paths"].items()  # type: ignore[attr-defined]
+        if path.startswith("/api/v1/_test/")
+        for operation in path_item.values()
+    ]
+    assert sorted(test_operation_ids) == [
         "cellar_list_bottles",
         "pantry_create_item",
         "pantry_list_items",
