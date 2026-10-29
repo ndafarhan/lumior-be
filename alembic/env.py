@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from lumior.core.config import get_settings
 from lumior.core.db import Base
+from lumior.modules.households import models as households_models  # noqa: F401
+from lumior.modules.identity import models as identity_models  # noqa: F401
 
 config = context.config
 

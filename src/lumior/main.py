@@ -9,6 +9,7 @@ from fastapi.routing import APIRoute
 
 from lumior.api import health
 from lumior.api.v1 import API_V1_PREFIX, api_router
+from lumior.core.clock import system_clock
 from lumior.core.config import Settings, get_settings
 from lumior.core.db import create_engine, create_sessionmaker
 from lumior.core.errors import UnhandledErrorMiddleware, register_exception_handlers
@@ -44,6 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.clock = system_clock
     app.state.engine = create_engine(settings)
     app.state.sessionmaker = create_sessionmaker(app.state.engine)
 
